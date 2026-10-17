@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-import type { Utilisateur } from './services/api'
+import type { Utilisateur } from '../types/utilisateur'
 
 type Props = {
   utilisateur: Utilisateur

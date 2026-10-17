@@ -1,16 +1,6 @@
+import type { Utilisateur } from '../types/utilisateur'
 
-
-export type Utilisateur = {
-  id: number
-  full_name: string
-  phone: string
-  email: string
-  role: string
-  status: string
-  created_at: string
-  updated_at: string
-}
-
+export type { Utilisateur } from '../types/utilisateur'
 
 const API_URL = 'http://127.0.0.1:8000'
 
@@ -42,6 +32,7 @@ export async function inscrireUtilisateur(donnees: {
 }
 
 
+
 export async function connecterUtilisateur(donnees: {
   phone: string
   password: string
@@ -65,5 +56,15 @@ export async function connecterUtilisateur(donnees: {
     throw new Error(message)
   }
 
-  return resultat as Utilisateur
+  // Vérifier que le backend a bien renvoyé l'utilisateur
+  if (!resultat?.user || !resultat?.access_token) {
+    throw new Error('Réponse de connexion invalide.')
+  }
+
+  // Enregistrer le jeton pour les futures requêtes protégées
+  localStorage.setItem('access_token', resultat.access_token)
+
+  // Retourner l'utilisateur, pas l'objet complet de connexion
+  return resultat.user as Utilisateur
 }
+
