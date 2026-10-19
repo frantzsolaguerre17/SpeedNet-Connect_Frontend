@@ -1,5 +1,9 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import {
+  creerCompteAdmin,
+  listerTousLesComptes,
+} from '../services/api'
 import type { Utilisateur } from '../types/utilisateur'
 
 type Props = {
@@ -36,7 +40,7 @@ const statistiques = [
 
 const navigation = [
   { titre: 'Vue d’ensemble', icone: '▦' },
-  { titre: 'Clients', icone: '♙' },
+  { titre: 'Comptes', icone: '♙' },
   { titre: 'Portefeuilles', icone: '◈' },
   { titre: 'Recharges', icone: '↗' },
   { titre: 'Forfaits Wi-Fi', icone: '◇' },
@@ -52,11 +56,103 @@ export default function AdminDashboard({
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false)
   const [sectionActive, setSectionActive] =
     useState('Vue d’ensemble')
+    
+const [clients, setClients] = useState<Utilisateur[]>([])
+const [chargementClients, setChargementClients] = useState(false)
+const [erreurClients, setErreurClients] = useState('')
+const [messageClients, setMessageClients] = useState('')
+const [formulaireOuvert, setFormulaireOuvert] = useState(false)
+const [creationEnCours, setCreationEnCours] = useState(false)
+
+const [nomClient, setNomClient] = useState('')
+const [telephoneClient, setTelephoneClient] = useState('')
+const [emailClient, setEmailClient] = useState('')
+const [motDePasseClient, setMotDePasseClient] = useState('')
+const [roleClient, setRoleClient] = useState<'user' | 'admin'>('user')
+
+useEffect(() => {
+  if (sectionActive !== 'Comptes') return
+
+  let actif = true
+
+  async function chargerClients() {
+    setChargementClients(true)
+    setErreurClients('')
+
+    try {
+      const resultat = await listerTousLesComptes()
+      if (actif) {
+        setClients(resultat)
+      }
+    } catch (erreur) {
+      if (actif) {
+        setErreurClients(
+          erreur instanceof Error
+            ? erreur.message
+            : 'Impossible de charger les clients.',
+        )
+      }
+    } finally {
+      if (actif) setChargementClients(false)
+    }
+  }
+
+  void chargerClients()
+
+  return () => {
+    actif = false
+  }
+}, [sectionActive])
+
 
   function choisirSection(titre: string) {
     setSectionActive(titre)
     setMenuMobileOuvert(false)
   }
+
+
+async function gererCreationCompte(
+  e: React.FormEvent<HTMLFormElement>,
+) {
+  e.preventDefault()
+  setErreurClients('')
+  setMessageClients('')
+  setCreationEnCours(true)
+
+  try {
+    await creerCompteAdmin({
+      full_name: nomClient,
+      phone: telephoneClient,
+      email: emailClient,
+      password: motDePasseClient,
+      role: roleClient,
+    })
+
+    const resultat = await listerTousLesComptes()
+    setClients(resultat)
+    setMessageClients(
+      roleClient === 'admin'
+        ? 'Compte administrateur créé avec succès.'
+        : 'Compte client créé avec succès.',
+    )
+
+    setNomClient('')
+    setTelephoneClient('')
+    setEmailClient('')
+    setMotDePasseClient('')
+    setRoleClient('user')
+    setFormulaireOuvert(false)
+  } catch (erreur) {
+    setErreurClients(
+      erreur instanceof Error
+        ? erreur.message
+        : 'Impossible de créer le compte.',
+    )
+  } finally {
+    setCreationEnCours(false)
+  }
+}
+
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -377,6 +473,168 @@ export default function AdminDashboard({
                 </div>
               </section>
             </>
+                   ) : sectionActive === 'Comptes' ? (
+            <section className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+                    Gestion des comptes
+                  </p>
+                  <h1 className="text-2xl font-extrabold sm:text-3xl">
+                    Comptes clients
+                  </h1>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {clients.length} compte(s) chargé(s).
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setFormulaireOuvert(!formulaireOuvert)}
+                  className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300"
+                >
+                  {formulaireOuvert ? 'Annuler' : '+ Créer un compte'}
+                </button>
+              </div>
+
+              {messageClients && (
+                <p className="rounded-xl bg-emerald-400/10 p-4 text-sm text-emerald-300">
+                  {messageClients}
+                </p>
+              )}
+
+              {erreurClients && (
+                <p role="alert" className="rounded-xl bg-red-400/10 p-4 text-sm text-red-300">
+                  {erreurClients}
+                </p>
+              )}
+
+              {formulaireOuvert && (
+                <form
+                  onSubmit={gererCreationCompte}
+                  className="grid gap-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5 sm:grid-cols-2"
+                >
+                  <label className="text-sm text-slate-300">
+                    Nom complet
+                    <input
+                      required
+                      value={nomClient}
+                      onChange={(e) => setNomClient(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+                    />
+                  </label>
+
+                  <label className="text-sm text-slate-300">
+                    Téléphone
+                    <input
+                      required
+                      value={telephoneClient}
+                      onChange={(e) => setTelephoneClient(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+                    />
+                  </label>
+
+                  <label className="text-sm text-slate-300">
+                    E-mail
+                    <input
+                      required
+                      type="email"
+                      value={emailClient}
+                      onChange={(e) => setEmailClient(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+                    />
+                  </label>
+
+                  <label className="text-sm text-slate-300">
+                    Mot de passe
+                    <input
+                      required
+                      type="password"
+                      minLength={8}
+                      value={motDePasseClient}
+                      onChange={(e) => setMotDePasseClient(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+                    />
+                  </label>
+
+                  <label className="text-sm text-slate-300 sm:col-span-2">
+                    Type de compte
+                    <select
+                      value={roleClient}
+                      onChange={(e) =>
+                        setRoleClient(e.target.value as 'user' | 'admin')
+                      }
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+                    >
+                      <option value="user">Client</option>
+                      <option value="admin">Administrateur</option>
+                    </select>
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={creationEnCours}
+                    className="rounded-xl bg-cyan-400 px-5 py-3 font-bold text-slate-950 disabled:opacity-50 sm:col-span-2"
+                  >
+                    {creationEnCours ? 'Création en cours…' : 'Créer le compte'}
+                  </button>
+                </form>
+              )}
+
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40">
+                {chargementClients ? (
+                  <p className="p-6 text-slate-400">Chargement des clients…</p>
+                ) : (
+                  
+<table className="w-full min-w-[900px] text-left text-sm">
+  <thead className="bg-white/[0.03] text-slate-400">
+    <tr>
+      <th className="p-4">Nom</th>
+      <th className="p-4">Téléphone</th>
+      <th className="p-4">E-mail</th>
+      <th className="p-4">Rôle</th>
+      <th className="p-4">Statut</th>
+      <th className="p-4">Date de création</th>
+    </tr>
+  </thead>
+
+  <tbody className="divide-y divide-white/5">
+    {clients.map((client) => (
+      <tr key={client.id}>
+        <td className="p-4">{client.full_name}</td>
+        <td className="p-4">{client.phone}</td>
+        <td className="p-4">{client.email}</td>
+        <td className="p-4">
+          <span
+            className={
+              client.role === 'admin'
+                ? 'rounded-lg bg-cyan-400/10 px-2 py-1 text-cyan-300'
+                : 'rounded-lg bg-white/5 px-2 py-1 text-slate-300'
+            }
+          >
+            {client.role === 'admin' ? 'Administrateur' : 'Client'}
+          </span>
+        </td>
+        <td className="p-4">{client.status}</td>
+        <td className="p-4">
+          {client.created_at
+            ? new Date(client.created_at).toLocaleDateString('fr-FR')
+            : '—'}
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+                )}
+
+                {!chargementClients && clients.length === 0 && (
+                  <p className="p-5 text-sm text-slate-400">
+                    Aucun compte à afficher.
+                  </p>
+                )}
+              </div>
+            </section>
           ) : (
             <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 sm:p-8">
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">

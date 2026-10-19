@@ -68,3 +68,96 @@ export async function connecterUtilisateur(donnees: {
   return resultat.user as Utilisateur
 }
 
+
+export async function listerClients(): Promise<Utilisateur[]> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter en tant qu’administrateur.')
+  }
+
+  const response = await fetch(`${API_URL}/users/admin/clients`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const resultat = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(
+      typeof resultat?.detail === 'string'
+        ? resultat.detail
+        : 'Impossible de charger les comptes clients.',
+    )
+  }
+
+  return resultat as Utilisateur[]
+}
+
+export async function creerCompteAdmin(donnees: {
+  full_name: string
+  phone: string
+  email: string
+  password: string
+  role: 'user' | 'admin'
+}): Promise<Utilisateur> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter en tant qu’administrateur.')
+  }
+
+  const response = await fetch(`${API_URL}/users/admin/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(donnees),
+  })
+
+  const resultat = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(
+      typeof resultat?.detail === 'string'
+        ? resultat.detail
+        : 'Impossible de créer le compte.',
+    )
+  }
+
+  return resultat as Utilisateur
+}
+
+
+
+
+
+export async function listerTousLesComptes(): Promise<Utilisateur[]> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter en tant qu’administrateur.')
+  }
+
+  const response = await fetch(`${API_URL}/users/admin/users`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const resultat = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(
+      typeof resultat?.detail === 'string'
+        ? resultat.detail
+        : 'Impossible de charger tous les comptes.',
+    )
+  }
+
+  return resultat as Utilisateur[]
+}

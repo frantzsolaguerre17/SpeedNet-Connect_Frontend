@@ -47,8 +47,16 @@ function App() {
           password: motDePasse,
         })
 
-        console.log('Réponse de connexion :', profil)
-        console.log('Rôle reçu :', profil?.role)
+        // Les comptes clients ne peuvent pas accéder au Web.
+        if (profil.role !== 'admin') {
+          localStorage.removeItem('access_token')
+          setErreur(true)
+          setMessage(
+            'Vous n’avez pas accès à cette plateforme Web. Vous êtes un client. Veuillez utiliser l’application mobile SpeedNetConnect pour connecter a votre compte si vous avez deja un compte client.',
+          )
+          setMotDePasse('')
+          return
+        }
 
         setUtilisateur(profil)
         setMessage(
@@ -73,6 +81,7 @@ function App() {
   }
 
   function deconnecter() {
+    localStorage.removeItem('access_token')
     setUtilisateur(null)
     setTelephone('')
     setMotDePasse('')
