@@ -1,15 +1,28 @@
 
-import { useEffect, useState } from 'react'
 import {
   creerCompteAdmin,
   listerTousLesComptes,
+  rechargerCompte,
+  listerForfaitsWifi,
+  creerForfaitWifi,
+  ajouterCodeWifi,
+  listerTousLesCodesWifi,
 } from '../services/api'
-import type { Utilisateur } from '../types/utilisateur'
+
+import type {
+  ForfaitWifi,
+  Utilisateur,
+  CodeWifi,
+} from '../services/api'
+
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
 type Props = {
   utilisateur: Utilisateur
   onDeconnecter: () => void
 }
+
 
 const statistiques = [
   {
@@ -48,6 +61,7 @@ const navigation = [
   { titre: 'Commandes', icone: '≡' },
 ]
 
+
 export default function AdminDashboard({
   utilisateur,
   onDeconnecter,
@@ -56,48 +70,130 @@ export default function AdminDashboard({
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false)
   const [sectionActive, setSectionActive] =
     useState('Vue d’ensemble')
-    
-const [clients, setClients] = useState<Utilisateur[]>([])
-const [chargementClients, setChargementClients] = useState(false)
-const [erreurClients, setErreurClients] = useState('')
-const [messageClients, setMessageClients] = useState('')
-const [formulaireOuvert, setFormulaireOuvert] = useState(false)
-const [creationEnCours, setCreationEnCours] = useState(false)
 
-const [nomClient, setNomClient] = useState('')
-const [telephoneClient, setTelephoneClient] = useState('')
-const [emailClient, setEmailClient] = useState('')
-const [motDePasseClient, setMotDePasseClient] = useState('')
-const [roleClient, setRoleClient] = useState<'user' | 'admin'>('user')
+  const [clients, setClients] = useState<Utilisateur[]>([])
+  const [chargementClients, setChargementClients] = useState(false)
+  const [erreurClients, setErreurClients] = useState('')
+  const [messageClients, setMessageClients] = useState('')
+  const [formulaireOuvert, setFormulaireOuvert] = useState(false)
+  const [creationEnCours, setCreationEnCours] = useState(false)
 
-useEffect(() => {
-  if (sectionActive !== 'Comptes') return
+  const [nomClient, setNomClient] = useState('')
+  const [telephoneClient, setTelephoneClient] = useState('')
+  const [emailClient, setEmailClient] = useState('')
+  const [motDePasseClient, setMotDePasseClient] = useState('')
+  const [roleClient, setRoleClient] = useState<'user' | 'admin'>('user')
+
+  const [clientARecharger, setClientARecharger] =
+    useState<Utilisateur | null>(null)
+  const [montantRecharge, setMontantRecharge] = useState('')
+  const [rechargeEnCours, setRechargeEnCours] = useState(false)
+
+// Gestion des forfaits Wi-Fi
+const [forfaitsWifi, setForfaitsWifi] = useState<ForfaitWifi[]>([])
+const [chargementForfaits, setChargementForfaits] = useState(false)
+const [erreurWifi, setErreurWifi] = useState('')
+const [messageWifi, setMessageWifi] = useState('')
+const [creationForfaitEnCours, setCreationForfaitEnCours] = useState(false)
+const [ajoutCodeEnCours, setAjoutCodeEnCours] = useState(false)
+
+const [nomForfait, setNomForfait] = useState('')
+const [dureeForfait, setDureeForfait] = useState('1')
+const [prixForfait, setPrixForfait] = useState('')
+const [descriptionForfait, setDescriptionForfait] = useState('')
+
+const [forfaitCodeId, setForfaitCodeId] = useState('')
+const [nouveauCodeWifi, setNouveauCodeWifi] = useState('')
+const [codesWifi, setCodesWifi] = useState<CodeWifi[]>([])
+const [chargementCodesWifi, setChargementCodesWifi] = useState(false)
+const [filtreCodesWifi, setFiltreCodesWifi] = useState<
+  'TOUS' | 'DISPONIBLE' | 'VENDU'
+>('TOUS')
+
+const [pageCodesWifi, setPageCodesWifi] = useState(1)
+const codesParPage = 10
+
+  useEffect(() => {
+    if (sectionActive !== 'Comptes') return
+
+    let actif = true
+
+    async function chargerClients() {
+      setChargementClients(true)
+      setErreurClients('')
+
+      try {
+        const resultat = await listerTousLesComptes()
+
+        if (actif) {
+          setClients(resultat)
+        }
+      } catch (erreur) {
+        if (actif) {
+          setErreurClients(
+            erreur instanceof Error
+              ? erreur.message
+              : 'Impossible de charger les clients.',
+          )
+        }
+      } finally {
+        if (actif) {
+          setChargementClients(false)
+        }
+      }
+    }
+
+    void chargerClients()
+
+    return () => {
+      actif = false
+    }
+  }, [sectionActive])
+
+
+  useEffect(() => {
+  if (
+    sectionActive !== 'Forfaits Wi-Fi' &&
+    sectionActive !== 'Codes Wi-Fi'
+  ) {
+    return
+  }
 
   let actif = true
 
-  async function chargerClients() {
-    setChargementClients(true)
-    setErreurClients('')
+  async function chargerForfaits() {
+    setChargementForfaits(true)
+    setErreurWifi('')
 
     try {
-      const resultat = await listerTousLesComptes()
+      const resultat = await listerForfaitsWifi()
+
       if (actif) {
-        setClients(resultat)
+        setForfaitsWifi(resultat)
+
+        if (
+          resultat.length > 0 &&
+          !resultat.some(
+            (forfait) => String(forfait.id) === forfaitCodeId,
+          )
+        ) {
+          setForfaitCodeId(String(resultat[0].id))
+        }
       }
     } catch (erreur) {
       if (actif) {
-        setErreurClients(
+        setErreurWifi(
           erreur instanceof Error
             ? erreur.message
-            : 'Impossible de charger les clients.',
+            : 'Impossible de charger les forfaits Wi-Fi.',
         )
       }
     } finally {
-      if (actif) setChargementClients(false)
+      if (actif) setChargementForfaits(false)
     }
   }
 
-  void chargerClients()
+  void chargerForfaits()
 
   return () => {
     actif = false
@@ -105,54 +201,266 @@ useEffect(() => {
 }, [sectionActive])
 
 
+useEffect(() => {
+  if (sectionActive !== 'Codes Wi-Fi') return
+
+  let actif = true
+
+  async function chargerCodes() {
+    setChargementCodesWifi(true)
+
+    try {
+      const resultat = await listerTousLesCodesWifi()
+
+      if (actif) {
+        setCodesWifi(resultat)
+        setErreurWifi('')
+      }
+    } catch (erreur) {
+      if (actif) {
+        setErreurWifi(
+          erreur instanceof Error
+            ? erreur.message
+            : 'Impossible de charger les codes Wi-Fi.',
+        )
+      }
+    } finally {
+      if (actif) setChargementCodesWifi(false)
+    }
+  }
+
+  void chargerCodes()
+
+  return () => {
+    actif = false
+  }
+}, [sectionActive])
+
   function choisirSection(titre: string) {
     setSectionActive(titre)
     setMenuMobileOuvert(false)
   }
 
+  async function gererCreationCompte(
+    e: FormEvent<HTMLFormElement>,
+  ) {
+    e.preventDefault()
+    setErreurClients('')
+    setMessageClients('')
+    setCreationEnCours(true)
 
-async function gererCreationCompte(
-  e: React.FormEvent<HTMLFormElement>,
+    try {
+      await creerCompteAdmin({
+        full_name: nomClient,
+        phone: telephoneClient,
+        email: emailClient,
+        password: motDePasseClient,
+        role: roleClient,
+      })
+
+      const resultat = await listerTousLesComptes()
+      setClients(resultat)
+
+      setMessageClients(
+        roleClient === 'admin'
+          ? 'Compte administrateur créé avec succès.'
+          : 'Compte client créé avec succès.',
+      )
+
+      setNomClient('')
+      setTelephoneClient('')
+      setEmailClient('')
+      setMotDePasseClient('')
+      setRoleClient('user')
+      setFormulaireOuvert(false)
+    } catch (erreur) {
+      setErreurClients(
+        erreur instanceof Error
+          ? erreur.message
+          : 'Impossible de créer le compte.',
+      )
+    } finally {
+      setCreationEnCours(false)
+    }
+  }
+
+  async function gererRecharge(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+
+    if (!clientARecharger) return
+
+    const montant = montantRecharge.trim()
+
+    if (
+      !montant ||
+      !Number.isFinite(Number(montant)) ||
+      Number(montant) <= 0
+    ) {
+      setErreurClients(
+        'Saisis un montant valide supérieur à 0 HTG.',
+      )
+      return
+    }
+
+    setErreurClients('')
+    setMessageClients('')
+    setRechargeEnCours(true)
+
+    try {
+      const resultat = await rechargerCompte(
+        clientARecharger.id,
+        montant,
+      )
+
+      setMessageClients(
+        `Recharge réussie pour ${clientARecharger.full_name}. Nouveau solde : ${resultat.balance} ${resultat.currency}.`,
+      )
+
+      setClientARecharger(null)
+      setMontantRecharge('')
+    } catch (erreur) {
+      setErreurClients(
+        erreur instanceof Error
+          ? erreur.message
+          : 'Impossible d’effectuer la recharge.',
+      )
+    } finally {
+      setRechargeEnCours(false)
+    }
+  }
+
+
+  async function gererCreationForfait(
+  e: FormEvent<HTMLFormElement>,
 ) {
   e.preventDefault()
-  setErreurClients('')
-  setMessageClients('')
-  setCreationEnCours(true)
+  setErreurWifi('')
+  setMessageWifi('')
+
+  const prix = Number(prixForfait)
+  const duree = Number(dureeForfait)
+
+  if (!Number.isFinite(prix) || prix <= 0) {
+    setErreurWifi('Le prix doit être supérieur à zéro.')
+    return
+  }
+
+  if (!Number.isInteger(duree) || duree <= 0) {
+    setErreurWifi('La durée doit être un nombre entier positif.')
+    return
+  }
+
+  setCreationForfaitEnCours(true)
 
   try {
-    await creerCompteAdmin({
-      full_name: nomClient,
-      phone: telephoneClient,
-      email: emailClient,
-      password: motDePasseClient,
-      role: roleClient,
+    const resultat = await creerForfaitWifi({
+      name: nomForfait.trim(),
+      duration_hours: duree,
+      price: prix,
+      currency: 'HTG',
+      description: descriptionForfait.trim(),
     })
 
-    const resultat = await listerTousLesComptes()
-    setClients(resultat)
-    setMessageClients(
-      roleClient === 'admin'
-        ? 'Compte administrateur créé avec succès.'
-        : 'Compte client créé avec succès.',
-    )
+    const liste = await listerForfaitsWifi()
+    setForfaitsWifi(liste)
+    setForfaitCodeId(String(resultat.id))
 
-    setNomClient('')
-    setTelephoneClient('')
-    setEmailClient('')
-    setMotDePasseClient('')
-    setRoleClient('user')
-    setFormulaireOuvert(false)
+    setNomForfait('')
+    setDureeForfait('1')
+    setPrixForfait('')
+    setDescriptionForfait('')
+
+    setMessageWifi('Forfait Wi-Fi créé avec succès.')
   } catch (erreur) {
-    setErreurClients(
+    setErreurWifi(
       erreur instanceof Error
         ? erreur.message
-        : 'Impossible de créer le compte.',
+        : 'Impossible de créer le forfait.',
     )
   } finally {
-    setCreationEnCours(false)
+    setCreationForfaitEnCours(false)
   }
 }
 
+async function gererAjoutCode(e: FormEvent<HTMLFormElement>) {
+  e.preventDefault()
+  setErreurWifi('')
+  setMessageWifi('')
+
+  const code = nouveauCodeWifi.trim()
+  const planId = Number(forfaitCodeId)
+
+  if (!forfaitCodeId || !Number.isInteger(planId)) {
+    setErreurWifi('Sélectionne un forfait Wi-Fi.')
+    return
+  }
+
+  if (!code) {
+    setErreurWifi('Saisis un code Wi-Fi.')
+    return
+  }
+
+  setAjoutCodeEnCours(true)
+
+  try {
+   await ajouterCodeWifi(planId, code)
+
+setNouveauCodeWifi('')
+await actualiserCodesWifi()
+
+setMessageWifi('Code Wi-Fi ajouté avec succès.')
+  } catch (erreur) {
+    setErreurWifi(
+      erreur instanceof Error
+        ? erreur.message
+        : 'Impossible d’ajouter le code Wi-Fi.',
+    )
+  } finally {
+    setAjoutCodeEnCours(false)
+  }
+}
+
+
+
+async function actualiserCodesWifi() {
+  setChargementCodesWifi(true)
+  setErreurWifi('')
+
+  try {
+    const resultat = await listerTousLesCodesWifi()
+    setCodesWifi(resultat)
+  } catch (erreur) {
+    setErreurWifi(
+      erreur instanceof Error
+        ? erreur.message
+        : 'Impossible de charger les codes Wi-Fi.',
+    )
+  } finally {
+    setChargementCodesWifi(false)
+  }
+}
+
+const codesFiltresWifi = codesWifi.filter((code) => {
+  const statut = code.status.toUpperCase()
+
+  if (filtreCodesWifi === 'TOUS') return true
+
+  if (filtreCodesWifi === 'DISPONIBLE') {
+    return statut === 'AVAILABLE' || statut === 'DISPONIBLE'
+  }
+
+  return statut === 'SOLD' || statut === 'VENDU'
+})
+
+const totalPagesCodesWifi = Math.max(
+  1,
+  Math.ceil(codesFiltresWifi.length / codesParPage),
+)
+
+const codesAffichesWifi = codesFiltresWifi.slice(
+  (pageCodesWifi - 1) * codesParPage,
+  pageCodesWifi * codesParPage,
+)
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -271,6 +579,7 @@ async function gererCreationCompte(
                     <span className="flex-1 text-left">
                       {item.titre}
                     </span>
+
                     {index === 3 && (
                       <span className="rounded-md bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
                         À suivre
@@ -288,10 +597,7 @@ async function gererCreationCompte(
           {!sidebarReduit && (
             <div className="mb-3 flex items-center gap-3 rounded-xl bg-white/[0.04] p-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 font-bold text-cyan-300">
-                {utilisateur.full_name
-                  .trim()
-                  .charAt(0)
-                  .toUpperCase()}
+                {utilisateur.full_name.trim().charAt(0).toUpperCase()}
               </div>
 
               <div className="min-w-0 flex-1">
@@ -339,7 +645,7 @@ async function gererCreationCompte(
         </div>
       </aside>
 
-      {/* Zone principale : décalée selon la largeur du sidebar */}
+      {/* Zone principale */}
       <div
         className={`min-h-screen transition-[padding] duration-300 ${
           sidebarReduit ? 'md:pl-[76px]' : 'md:pl-64'
@@ -378,10 +684,7 @@ async function gererCreationCompte(
             </div>
 
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 font-bold text-cyan-300">
-              {utilisateur.full_name
-                .trim()
-                .charAt(0)
-                .toUpperCase()}
+              {utilisateur.full_name.trim().charAt(0).toUpperCase()}
             </div>
           </div>
         </header>
@@ -473,7 +776,7 @@ async function gererCreationCompte(
                 </div>
               </section>
             </>
-                   ) : sectionActive === 'Comptes' ? (
+          ) : sectionActive === 'Comptes' ? (
             <section className="space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -493,7 +796,9 @@ async function gererCreationCompte(
                   onClick={() => setFormulaireOuvert(!formulaireOuvert)}
                   className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300"
                 >
-                  {formulaireOuvert ? 'Annuler' : '+ Créer un compte'}
+                  {formulaireOuvert
+                    ? 'Annuler'
+                    : '+ Créer un compte'}
                 </button>
               </div>
 
@@ -504,11 +809,89 @@ async function gererCreationCompte(
               )}
 
               {erreurClients && (
-                <p role="alert" className="rounded-xl bg-red-400/10 p-4 text-sm text-red-300">
+                <p
+                  role="alert"
+                  className="rounded-xl bg-red-400/10 p-4 text-sm text-red-300"
+                >
                   {erreurClients}
                 </p>
               )}
 
+              {/* Formulaire de recharge */}
+              {clientARecharger && (
+                <form
+                  onSubmit={gererRecharge}
+                  className="rounded-2xl border border-cyan-400/20 bg-slate-900/60 p-5"
+                >
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold">
+                        Recharger le portefeuille
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Client : {clientARecharger.full_name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Téléphone : {clientARecharger.phone}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientARecharger(null)
+                        setMontantRecharge('')
+                        setErreurClients('')
+                      }}
+                      className="rounded-lg px-3 py-2 text-slate-400 hover:bg-white/5 hover:text-white"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+
+                  <label className="block text-sm text-slate-300">
+                    Montant de la recharge (HTG)
+                    <input
+                      required
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={montantRecharge}
+                      onChange={(e) =>
+                        setMontantRecharge(e.target.value)
+                      }
+                      placeholder="Ex. : 500"
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-400 sm:max-w-md"
+                    />
+                  </label>
+
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="submit"
+                      disabled={rechargeEnCours}
+                      className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50"
+                    >
+                      {rechargeEnCours
+                        ? 'Recharge en cours…'
+                        : 'Confirmer la recharge'}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={rechargeEnCours}
+                      onClick={() => {
+                        setClientARecharger(null)
+                        setMontantRecharge('')
+                      }}
+                      className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-white/5"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Formulaire de création de compte */}
               {formulaireOuvert && (
                 <form
                   onSubmit={gererCreationCompte}
@@ -529,7 +912,9 @@ async function gererCreationCompte(
                     <input
                       required
                       value={telephoneClient}
-                      onChange={(e) => setTelephoneClient(e.target.value)}
+                      onChange={(e) =>
+                        setTelephoneClient(e.target.value)
+                      }
                       className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
                     />
                   </label>
@@ -552,7 +937,9 @@ async function gererCreationCompte(
                       type="password"
                       minLength={8}
                       value={motDePasseClient}
-                      onChange={(e) => setMotDePasseClient(e.target.value)}
+                      onChange={(e) =>
+                        setMotDePasseClient(e.target.value)
+                      }
                       className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
                     />
                   </label>
@@ -562,7 +949,9 @@ async function gererCreationCompte(
                     <select
                       value={roleClient}
                       onChange={(e) =>
-                        setRoleClient(e.target.value as 'user' | 'admin')
+                        setRoleClient(
+                          e.target.value as 'user' | 'admin',
+                        )
                       }
                       className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
                     >
@@ -576,56 +965,95 @@ async function gererCreationCompte(
                     disabled={creationEnCours}
                     className="rounded-xl bg-cyan-400 px-5 py-3 font-bold text-slate-950 disabled:opacity-50 sm:col-span-2"
                   >
-                    {creationEnCours ? 'Création en cours…' : 'Créer le compte'}
+                    {creationEnCours
+                      ? 'Création en cours…'
+                      : 'Créer le compte'}
                   </button>
                 </form>
               )}
 
+              {/* Tableau des comptes */}
               <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40">
                 {chargementClients ? (
-                  <p className="p-6 text-slate-400">Chargement des clients…</p>
+                  <p className="p-6 text-slate-400">
+                    Chargement des clients…
+                  </p>
                 ) : (
-                  
-<table className="w-full min-w-[900px] text-left text-sm">
-  <thead className="bg-white/[0.03] text-slate-400">
-    <tr>
-      <th className="p-4">Nom</th>
-      <th className="p-4">Téléphone</th>
-      <th className="p-4">E-mail</th>
-      <th className="p-4">Rôle</th>
-      <th className="p-4">Statut</th>
-      <th className="p-4">Date de création</th>
-    </tr>
-  </thead>
+                  <table className="w-full min-w-[1000px] text-left text-sm">
+                    <thead className="bg-white/[0.03] text-slate-400">
+                      <tr>
+                        <th className="p-4">Nom</th>
+                        <th className="p-4">Téléphone</th>
+                        <th className="p-4">E-mail</th>
+                        <th className="p-4">Rôle</th>
+                        <th className="p-4">Statut</th>
+                        <th className="p-4">Date de création</th>
+                        <th className="p-4">Action</th>
+                      </tr>
+                    </thead>
 
-  <tbody className="divide-y divide-white/5">
-    {clients.map((client) => (
-      <tr key={client.id}>
-        <td className="p-4">{client.full_name}</td>
-        <td className="p-4">{client.phone}</td>
-        <td className="p-4">{client.email}</td>
-        <td className="p-4">
-          <span
-            className={
-              client.role === 'admin'
-                ? 'rounded-lg bg-cyan-400/10 px-2 py-1 text-cyan-300'
-                : 'rounded-lg bg-white/5 px-2 py-1 text-slate-300'
-            }
-          >
-            {client.role === 'admin' ? 'Administrateur' : 'Client'}
-          </span>
-        </td>
-        <td className="p-4">{client.status}</td>
-        <td className="p-4">
-          {client.created_at
-            ? new Date(client.created_at).toLocaleDateString('fr-FR')
-            : '—'}
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
+                    <tbody className="divide-y divide-white/5">
+                      {clients.map((client) => (
+                        <tr key={client.id}>
+                          <td className="p-4">
+                            {client.full_name}
+                          </td>
 
+                          <td className="p-4">
+                            {client.phone}
+                          </td>
+
+                          <td className="p-4">
+                            {client.email}
+                          </td>
+
+                          <td className="p-4">
+                            <span
+                              className={
+                                client.role === 'admin'
+                                  ? 'rounded-lg bg-cyan-400/10 px-2 py-1 text-cyan-300'
+                                  : 'rounded-lg bg-white/5 px-2 py-1 text-slate-300'
+                              }
+                            >
+                              {client.role === 'admin'
+                                ? 'Administrateur'
+                                : 'Client'}
+                            </span>
+                          </td>
+
+                          <td className="p-4">
+                            {client.status}
+                          </td>
+
+                          <td className="p-4">
+                            {client.created_at
+                              ? new Date(
+                                  client.created_at,
+                                ).toLocaleDateString('fr-FR')
+                              : '—'}
+                          </td>
+
+                          {/* Correction : le bouton est dans le map */}
+                          <td className="p-4">
+                            {client.role === 'user' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setClientARecharger(client)
+                                  setMontantRecharge('')
+                                  setErreurClients('')
+                                  setMessageClients('')
+                                }}
+                                className="rounded-lg bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-300 transition hover:bg-cyan-400/20"
+                              >
+                                Recharger
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
 
                 {!chargementClients && clients.length === 0 && (
@@ -635,31 +1063,398 @@ async function gererCreationCompte(
                 )}
               </div>
             </section>
+          ) : sectionActive === 'Forfaits Wi-Fi' ? (
+  <section className="space-y-6">
+    <div>
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+        Gestion du catalogue
+      </p>
+      <h1 className="text-2xl font-extrabold sm:text-3xl">
+        Forfaits Wi-Fi
+      </h1>
+      <p className="mt-2 text-sm text-slate-400">
+        Crée les forfaits proposés à tes clients.
+      </p>
+    </div>
+
+    {messageWifi && (
+      <p className="rounded-xl bg-emerald-400/10 p-4 text-sm text-emerald-300">
+        {messageWifi}
+      </p>
+    )}
+
+    {erreurWifi && (
+      <p role="alert" className="rounded-xl bg-red-400/10 p-4 text-sm text-red-300">
+        {erreurWifi}
+      </p>
+    )}
+
+    <form
+      onSubmit={gererCreationForfait}
+      className="grid gap-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5 sm:grid-cols-2"
+    >
+      <label className="text-sm text-slate-300">
+        Nom du forfait
+        <input
+          required
+          value={nomForfait}
+          onChange={(e) => setNomForfait(e.target.value)}
+          placeholder="Ex. : Wi-Fi 1 heure"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+        />
+      </label>
+
+      <label className="text-sm text-slate-300">
+        Durée (heures)
+        <input
+          required
+          type="number"
+          min="1"
+          step="1"
+          value={dureeForfait}
+          onChange={(e) => setDureeForfait(e.target.value)}
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+        />
+      </label>
+
+      <label className="text-sm text-slate-300">
+        Prix (HTG)
+        <input
+          required
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={prixForfait}
+          onChange={(e) => setPrixForfait(e.target.value)}
+          placeholder="Ex. : 50"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+        />
+      </label>
+
+      <label className="text-sm text-slate-300">
+        Description
+        <input
+          value={descriptionForfait}
+          onChange={(e) => setDescriptionForfait(e.target.value)}
+          placeholder="Description du forfait"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+        />
+      </label>
+
+      <button
+        type="submit"
+        disabled={creationForfaitEnCours}
+        className="rounded-xl bg-cyan-400 px-5 py-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50 sm:col-span-2"
+      >
+        {creationForfaitEnCours ? 'Création en cours…' : 'Créer le forfait'}
+      </button>
+    </form>
+
+    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40">
+      <div className="border-b border-white/10 p-5">
+        <h2 className="font-bold">Forfaits existants</h2>
+      </div>
+
+      {chargementForfaits ? (
+        <p className="p-5 text-sm text-slate-400">Chargement des forfaits…</p>
+      ) : forfaitsWifi.length === 0 ? (
+        <p className="p-5 text-sm text-slate-400">Aucun forfait disponible.</p>
+      ) : (
+        <table className="w-full min-w-[600px] text-left text-sm">
+          <thead className="bg-white/[0.03] text-slate-400">
+            <tr>
+              <th className="p-4">Nom</th>
+              <th className="p-4">Durée</th>
+              <th className="p-4">Prix</th>
+              <th className="p-4">Statut</th>
+            </tr>
+          </thead>
+          
+
+<tbody className="divide-y divide-white/5">
+  {forfaitsWifi.map((forfait) => (
+    <tr key={forfait.id}>
+      <td className="p-4 font-medium">{forfait.name}</td>
+      <td className="p-4">{forfait.duration_hours} h</td>
+      <td className="p-4">
+        {forfait.price} {forfait.currency}
+      </td>
+      <td className="p-4">{forfait.status}</td>
+    </tr>
+  ))}
+</tbody>
+
+
+        </table>
+      )}
+    </div>
+  </section>
+) : sectionActive === 'Codes Wi-Fi' ? (
+  <section className="space-y-6">
+    <div>
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+        Gestion du stock
+      </p>
+      <h1 className="text-2xl font-extrabold sm:text-3xl">Codes Wi-Fi</h1>
+      <p className="mt-2 text-sm text-slate-400">
+        Ajoute les codes un par un et associe chaque code à son forfait.
+      </p>
+    </div>
+
+    {messageWifi && (
+      <p className="rounded-xl bg-emerald-400/10 p-4 text-sm text-emerald-300">
+        {messageWifi}
+      </p>
+    )}
+
+    {erreurWifi && (
+      <p role="alert" className="rounded-xl bg-red-400/10 p-4 text-sm text-red-300">
+        {erreurWifi}
+      </p>
+    )}
+
+    <form
+      onSubmit={gererAjoutCode}
+      className="space-y-5 rounded-2xl border border-white/10 bg-slate-900/60 p-5"
+    >
+      <label className="block text-sm text-slate-300">
+        Forfait associé
+        <select
+          required
+          value={forfaitCodeId}
+          onChange={(e) => setForfaitCodeId(e.target.value)}
+          disabled={chargementForfaits || forfaitsWifi.length === 0}
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+        >
+          <option value="">Sélectionner un forfait</option>
+          {forfaitsWifi.map((forfait) => (
+            <option key={forfait.id} value={String(forfait.id)}>
+              {forfait.name} — {forfait.price} {forfait.currency}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="block text-sm text-slate-300">
+        Code Wi-Fi
+        <input
+          required
+          value={nouveauCodeWifi}
+          onChange={(e) => setNouveauCodeWifi(e.target.value)}
+          placeholder="Saisis un seul code"
+          autoComplete="off"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
+        />
+      </label>
+
+      <button
+        type="submit"
+        disabled={ajoutCodeEnCours || chargementForfaits || forfaitsWifi.length === 0}
+        className="rounded-xl bg-cyan-400 px-5 py-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50"
+      >
+        {ajoutCodeEnCours ? 'Ajout en cours…' : 'Ajouter ce code'}
+      </button>
+
+      {forfaitsWifi.length === 0 && !chargementForfaits && (
+        <p className="text-sm text-amber-300">
+          Crée d’abord un forfait dans la section « Forfaits Wi-Fi ».
+        </p>
+      )}
+    </form>
+
+    
+    {/* Liste des codes Wi-Fi */}
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 p-5">
+        <div>
+          <h2 className="font-bold">Tous les codes Wi-Fi</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {codesWifi.length} code(s) enregistré(s)
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void actualiserCodesWifi()}
+          disabled={chargementCodesWifi}
+          className="rounded-xl border border-cyan-400/20 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/10 disabled:opacity-50"
+        >
+          {chargementCodesWifi ? 'Actualisation…' : '↻ Actualiser'}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 p-5">
+        {(['TOUS', 'DISPONIBLE', 'VENDU'] as const).map((filtre) => (
+          <button
+            key={filtre}
+            type="button"
+           onClick={() => {
+  setFiltreCodesWifi(filtre)
+  setPageCodesWifi(1)
+}}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              filtreCodesWifi === filtre
+                ? 'bg-cyan-400 text-slate-950'
+                : 'border border-white/10 text-slate-300 hover:bg-white/5'
+            }`}
+          >
+            {filtre === 'TOUS'
+              ? 'Tous'
+              : filtre === 'DISPONIBLE'
+                ? 'Disponibles'
+                : 'Vendus'}
+          </button>
+        ))}
+      </div>
+
+      {chargementCodesWifi && codesWifi.length === 0 ? (
+        <p className="p-5 text-sm text-slate-400">
+          Chargement des codes Wi-Fi…
+        </p>
+      ) : (
+<div className="overflow-x-auto">
+          <table className="w-full min-w-[950px] table-fixed text-left text-sm">
+  <colgroup>
+    <col className="w-[45%]" />
+    <col className="w-[23%]" />
+    <col className="w-[14%]" />
+    <col className="w-[18%]" />
+  </colgroup>
+            <thead className="bg-white/[0.03] text-slate-400">
+              <tr>
+                <th className="p-4">Code Wi-Fi</th>
+                <th className="p-4">Forfait</th>
+                <th className="p-4">Statut</th>
+                <th className="p-4">Date d’ajout</th>
+              </tr>
+            </thead>
+
+            
+<tbody className="divide-y divide-white/5">
+  {codesAffichesWifi.map((code) => {
+    const statut = code.status.toUpperCase()
+    const vendu = statut === 'SOLD' || statut === 'VENDU'
+
+    return (
+      <tr
+        key={code.id}
+        className="transition hover:bg-white/[0.02]"
+      >
+        <td className="p-4">
+          <span className="block break-all rounded-lg border border-cyan-400/15 bg-cyan-400/[0.06] px-3 py-3 font-mono text-base font-bold tracking-wide text-cyan-300 sm:text-lg">
+            {code.code}
+          </span>
+        </td>
+
+        <td className="break-words p-4 font-medium text-slate-200">
+          {code.plan_name ??
+            forfaitsWifi.find((f) => f.id === code.plan_id)?.name ??
+            `Forfait #${code.plan_id}`}
+        </td>
+
+        <td className="p-4">
+          <span
+            className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-bold ${
+              vendu
+                ? 'bg-red-400/10 text-red-300'
+                : 'bg-emerald-400/10 text-emerald-300'
+            }`}
+          >
+            {vendu ? 'VENDU' : 'DISPONIBLE'}
+          </span>
+        </td>
+
+        <td className="whitespace-nowrap p-4 text-slate-300">
+          {code.created_at ? (
+            <>
+              <div className="font-medium">
+                {new Date(code.created_at).toLocaleDateString('fr-FR')}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {new Date(code.created_at).toLocaleTimeString('fr-FR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </div>
+            </>
           ) : (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 sm:p-8">
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
-                Gestion SpeedNetConnect
-              </p>
-
-              <h1 className="text-2xl font-extrabold sm:text-3xl">
-                {sectionActive}
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                Cette section est prête à être développée. Nous pourrons
-                ensuite la connecter aux données réelles de PostgreSQL
-                via FastAPI.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => choisirSection('Vue d’ensemble')}
-                className="mt-6 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
-              >
-                Retour au tableau de bord
-              </button>
-            </section>
+            <span className="text-slate-500">Date indisponible</span>
           )}
+        </td>
+      </tr>
+    )
+  })}
+</tbody>
+
+          </table>
+
+         {codesFiltresWifi.length === 0 && (
+  <p className="p-5 text-sm text-slate-400">
+    Aucun code dans cette catégorie.
+  </p>
+)}
+        </div>
+      )}
+
+      
+      {codesFiltresWifi.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 p-5">
+          <p className="text-sm text-slate-400">
+            Page {pageCodesWifi} sur {totalPagesCodesWifi}
+            {' · '}
+            {codesFiltresWifi.length} code(s)
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={pageCodesWifi === 1}
+              onClick={() =>
+                setPageCodesWifi((page) => Math.max(1, page - 1))
+              }
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Précédent
+            </button>
+
+            <button
+              type="button"
+              disabled={pageCodesWifi >= totalPagesCodesWifi}
+              onClick={() =>
+                setPageCodesWifi((page) =>
+                  Math.min(totalPagesCodesWifi, page + 1)
+                )
+              }
+              className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  </section>
+) : (
+  <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 sm:p-8">
+    <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+      Gestion SpeedNetConnect
+    </p>
+    <h1 className="text-2xl font-extrabold sm:text-3xl">
+      {sectionActive}
+    </h1>
+    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+      Cette section sera connectée aux données de PostgreSQL via FastAPI.
+    </p>
+    <button
+      type="button"
+      onClick={() => choisirSection('Vue d’ensemble')}
+      className="mt-6 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
+    >
+      Retour au tableau de bord
+    </button>
+  </section>
+)}
         </main>
 
         <footer className="border-t border-white/10 px-6 py-5 text-center text-xs text-slate-600">

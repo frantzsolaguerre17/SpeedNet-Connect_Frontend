@@ -161,3 +161,167 @@ export async function listerTousLesComptes(): Promise<Utilisateur[]> {
 
   return resultat as Utilisateur[]
 }
+
+
+
+
+export type RechargeResponse = {
+  message: string
+  user_id: number
+  balance: string | number
+  currency: string
+}
+
+export async function rechargerCompte(
+  userId: number,
+  amount: string,
+): Promise<RechargeResponse> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter en tant qu’administrateur.')
+  }
+
+  const response = await fetch(
+    `${API_URL}/users/admin/users/${userId}/recharge`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ amount }),
+    },
+  )
+
+  const resultat = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(
+      typeof resultat?.detail === 'string'
+        ? resultat.detail
+        : 'Impossible d’effectuer la recharge.',
+    )
+  }
+
+  return resultat as RechargeResponse
+}
+
+
+
+
+export type ForfaitWifi = {
+  id: number
+  name: string
+  duration_hours: number
+  price: string | number
+  currency: string
+  description: string | null
+  status: string
+}
+
+
+export type CodeWifi = {
+  id: number
+  code: string
+  status: string
+  plan_id: number
+  plan_name: string
+  created_at: string | null
+}
+
+
+
+function obtenirTokenAdmin(): string {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter en tant qu’administrateur.')
+  }
+
+  return token
+}
+
+async function lireReponse<T>(response: Response): Promise<T> {
+  const resultat = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(
+      typeof resultat?.detail === 'string'
+        ? resultat.detail
+        : 'Une erreur est survenue lors de la requête.',
+    )
+  }
+
+  return resultat as T
+}
+
+// Charger les forfaits Wi-Fi
+export async function listerForfaitsWifi(): Promise<ForfaitWifi[]> {
+  const response = await fetch(`${API_URL}/wifi/plans`)
+  return lireReponse<ForfaitWifi[]>(response)
+}
+
+// Créer un forfait Wi-Fi
+export async function creerForfaitWifi(donnees: {
+  name: string
+  duration_hours: number
+  price: number
+  currency: string
+  description: string
+}) {
+  const token = obtenirTokenAdmin()
+
+  const response = await fetch(`${API_URL}/wifi/admin/plans`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(donnees),
+  })
+
+  return lireReponse<ForfaitWifi>(response)
+}
+
+// Ajouter UN SEUL code à un forfait existant
+export async function ajouterCodeWifi(
+  planId: number,
+  code: string,
+) {
+  const token = obtenirTokenAdmin()
+
+  const response = await fetch(`${API_URL}/wifi/admin/codes/import`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      plan_id: planId,
+      codes: [code.trim()],
+    }),
+  })
+
+  return lireReponse<unknown>(response)
+}
+
+
+
+
+export async function listerTousLesCodesWifi(): Promise<CodeWifi[]> {
+  const token = obtenirTokenAdmin()
+
+  const response = await fetch(`${API_URL}/wifi/admin/codes`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const data = await lireReponse<CodeWifi[]>(response)
+
+  console.log('Codes Wi-Fi reçus du backend :', data)
+
+  return data
+}
