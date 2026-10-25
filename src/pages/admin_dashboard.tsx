@@ -7,6 +7,7 @@ import {
   creerForfaitWifi,
   ajouterCodeWifi,
   listerTousLesCodesWifi,
+  listerStatistiquesAdmin,
 } from '../services/api'
 
 import type {
@@ -44,7 +45,7 @@ const statistiques = [
     description: 'Codes Wi-Fi en stock',
   },
   {
-    titre: 'Recharges en attente',
+    titre: 'Plans disponibles',
     valeur: '—',
     icone: 'clock',
     description: 'Recharges à vérifier',
@@ -60,6 +61,7 @@ const navigation = [
   { titre: 'Codes Wi-Fi', icone: '▤' },
   { titre: 'Commandes', icone: '≡' },
 ]
+
 
 
 export default function AdminDashboard({
@@ -80,7 +82,6 @@ export default function AdminDashboard({
 
   const [nomClient, setNomClient] = useState('')
   const [telephoneClient, setTelephoneClient] = useState('')
-  const [emailClient, setEmailClient] = useState('')
   const [motDePasseClient, setMotDePasseClient] = useState('')
   const [roleClient, setRoleClient] = useState<'user' | 'admin'>('user')
 
@@ -112,6 +113,17 @@ const [filtreCodesWifi, setFiltreCodesWifi] = useState<
 
 const [pageCodesWifi, setPageCodesWifi] = useState(1)
 const codesParPage = 10
+
+
+const [statsAdmin, setStatsAdmin] = useState({
+  clients_inscrits: 0,
+  ventes_du_jour: '0.00',
+  codes_disponibles: 0,
+  plans_disponibles: 0,
+})
+
+const [chargementStats, setChargementStats] = useState(true)
+const [erreurStats, setErreurStats] = useState('')
 
   useEffect(() => {
     if (sectionActive !== 'Comptes') return
@@ -150,6 +162,42 @@ const codesParPage = 10
     }
   }, [sectionActive])
 
+
+
+  useEffect(() => {
+  let actif = true
+
+  async function chargerStatistiques() {
+    try {
+      setChargementStats(true)
+      setErreurStats('')
+
+      const resultat = await listerStatistiquesAdmin()
+
+      if (actif) {
+        setStatsAdmin(resultat)
+      }
+    } catch (erreur) {
+      if (actif) {
+        setErreurStats(
+          erreur instanceof Error
+            ? erreur.message
+            : 'Impossible de charger les statistiques.',
+        )
+      }
+    } finally {
+      if (actif) {
+        setChargementStats(false)
+      }
+    }
+  }
+
+  void chargerStatistiques()
+
+  return () => {
+    actif = false
+  }
+}, [])
 
   useEffect(() => {
   if (
@@ -269,7 +317,6 @@ useEffect(() => {
 
       setNomClient('')
       setTelephoneClient('')
-      setEmailClient('')
       setMotDePasseClient('')
       setRoleClient('user')
       setFormulaireOuvert(false)
@@ -730,7 +777,19 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                     </div>
 
                     <p className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                      {stat.valeur}
+                      {chargementStats
+  ? '…'
+  : stat.titre === 'Clients inscrits'
+    ? statsAdmin.clients_inscrits.toLocaleString('fr-FR')
+    : stat.titre === 'Ventes du jour'
+      ? `${Number(statsAdmin.ventes_du_jour).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} HTG`
+      : stat.titre === 'Codes disponibles'
+        ? statsAdmin.codes_disponibles.toLocaleString('fr-FR')
+        : statsAdmin.plans_disponibles.toLocaleString('fr-FR')
+        }
                     </p>
 
                     <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -920,17 +979,6 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                   </label>
 
                   <label className="text-sm text-slate-300">
-                    E-mail
-                    <input
-                      required
-                      type="email"
-                      value={emailClient}
-                      onChange={(e) => setEmailClient(e.target.value)}
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3"
-                    />
-                  </label>
-
-                  <label className="text-sm text-slate-300">
                     Mot de passe
                     <input
                       required
@@ -984,7 +1032,6 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                       <tr>
                         <th className="p-4">Nom</th>
                         <th className="p-4">Téléphone</th>
-                        <th className="p-4">E-mail</th>
                         <th className="p-4">Rôle</th>
                         <th className="p-4">Statut</th>
                         <th className="p-4">Date de création</th>
@@ -1001,10 +1048,6 @@ const codesAffichesWifi = codesFiltresWifi.slice(
 
                           <td className="p-4">
                             {client.phone}
-                          </td>
-
-                          <td className="p-4">
-                            {client.email}
                           </td>
 
                           <td className="p-4">

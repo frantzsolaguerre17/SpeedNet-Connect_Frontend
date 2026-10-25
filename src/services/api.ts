@@ -325,3 +325,25 @@ export async function listerTousLesCodesWifi(): Promise<CodeWifi[]> {
 
   return data
 }
+
+
+
+export type StatistiquesAdmin = {
+  clients_inscrits: number
+  ventes_du_jour: string | number
+  codes_disponibles: number
+  plans_disponibles: number
+}
+
+export async function listerStatistiquesAdmin(): Promise<StatistiquesAdmin> {
+  const token = obtenirTokenAdmin()
+
+  const response = await fetch(`${API_URL}/users/admin/stats`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  return lireReponse<StatistiquesAdmin>(response)
+}
