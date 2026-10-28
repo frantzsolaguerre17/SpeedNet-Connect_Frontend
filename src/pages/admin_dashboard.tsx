@@ -10,6 +10,11 @@ import {
   listerStatistiquesAdmin,
 } from '../services/api'
 
+import {
+  listerTransactionsRecentesAdmin,
+  type TransactionAdmin,
+} from "../services/api";
+
 import type {
   ForfaitWifi,
   Utilisateur,
@@ -56,13 +61,17 @@ const navigation = [
   { titre: 'Vue d’ensemble', icone: '▦' },
   { titre: 'Comptes', icone: '♙' },
   { titre: 'Portefeuilles', icone: '◈' },
-  { titre: 'Recharges', icone: '↗' },
+  //{ titre: 'Recharges', icone: '↗' },
   { titre: 'Forfaits Wi-Fi', icone: '◇' },
   { titre: 'Codes Wi-Fi', icone: '▤' },
-  { titre: 'Commandes', icone: '≡' },
+  //{ titre: 'Commandes', icone: '≡' },
 ]
 
 
+type ClientPortefeuille = Utilisateur & {
+  balance?: number | string
+  currency?: string
+}
 
 export default function AdminDashboard({
   utilisateur,
@@ -72,8 +81,9 @@ export default function AdminDashboard({
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false)
   const [sectionActive, setSectionActive] =
     useState('Vue d’ensemble')
+  const [versionClients, setVersionClients] = useState(0)
 
-  const [clients, setClients] = useState<Utilisateur[]>([])
+  const [clients, setClients] = useState<ClientPortefeuille[]>([])
   const [chargementClients, setChargementClients] = useState(false)
   const [erreurClients, setErreurClients] = useState('')
   const [messageClients, setMessageClients] = useState('')
@@ -89,6 +99,13 @@ export default function AdminDashboard({
     useState<Utilisateur | null>(null)
   const [montantRecharge, setMontantRecharge] = useState('')
   const [rechargeEnCours, setRechargeEnCours] = useState(false)
+
+  const [transactionsRecentes, setTransactionsRecentes] =
+  useState<TransactionAdmin[]>([]);
+const [chargementTransactions, setChargementTransactions] =
+  useState(true);
+const [erreurTransactions, setErreurTransactions] =
+  useState<string | null>(null);
 
 // Gestion des forfaits Wi-Fi
 const [forfaitsWifi, setForfaitsWifi] = useState<ForfaitWifi[]>([])
@@ -126,7 +143,12 @@ const [chargementStats, setChargementStats] = useState(true)
 const [erreurStats, setErreurStats] = useState('')
 
   useEffect(() => {
-    if (sectionActive !== 'Comptes') return
+    if (
+  sectionActive !== 'Comptes' &&
+  sectionActive !== 'Portefeuilles'
+) {
+  return
+}
 
     let actif = true
 
@@ -160,7 +182,7 @@ const [erreurStats, setErreurStats] = useState('')
     return () => {
       actif = false
     }
-  }, [sectionActive])
+  }, [sectionActive, versionClients])
 
 
 
@@ -250,6 +272,45 @@ const [erreurStats, setErreurStats] = useState('')
 
 
 useEffect(() => {
+  let actif = true;
+
+  async function chargerTransactions() {
+    try {
+      setChargementTransactions(true);
+      setErreurTransactions(null);
+
+      const resultat = await listerTransactionsRecentesAdmin();
+
+      if (actif) {
+        setTransactionsRecentes(resultat);
+      }
+    } catch (erreur) {
+      console.error(
+        "Erreur lors du chargement des transactions récentes :",
+        erreur
+      );
+
+      if (actif) {
+        setErreurTransactions(
+          "Impossible de charger les transactions récentes."
+        );
+      }
+    } finally {
+      if (actif) {
+        setChargementTransactions(false);
+      }
+    }
+  }
+
+  chargerTransactions();
+
+  return () => {
+    actif = false;
+  };
+}, []);
+
+
+useEffect(() => {
   if (sectionActive !== 'Codes Wi-Fi') return
 
   let actif = true
@@ -301,7 +362,6 @@ useEffect(() => {
       await creerCompteAdmin({
         full_name: nomClient,
         phone: telephoneClient,
-        email: emailClient,
         password: motDePasseClient,
         role: roleClient,
       })
@@ -358,6 +418,9 @@ useEffect(() => {
         clientARecharger.id,
         montant,
       )
+
+      const comptesActualises = await listerTousLesComptes()
+      setClients(comptesActualises)
 
       setMessageClients(
         `Recharge réussie pour ${clientARecharger.full_name}. Nouveau solde : ${resultat.balance} ${resultat.currency}.`,
@@ -626,12 +689,6 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                     <span className="flex-1 text-left">
                       {item.titre}
                     </span>
-
-                    {index === 3 && (
-                      <span className="rounded-md bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                        À suivre
-                      </span>
-                    )}
                   </>
                 )}
               </button>
@@ -777,20 +834,21 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                     </div>
 
                     <p className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                      {chargementStats
-  ? '…'
-  : stat.titre === 'Clients inscrits'
-    ? statsAdmin.clients_inscrits.toLocaleString('fr-FR')
-    : stat.titre === 'Ventes du jour'
-      ? `${Number(statsAdmin.ventes_du_jour).toLocaleString('fr-FR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })} HTG`
-      : stat.titre === 'Codes disponibles'
-        ? statsAdmin.codes_disponibles.toLocaleString('fr-FR')
-        : statsAdmin.plans_disponibles.toLocaleString('fr-FR')
-        }
-                    </p>
+  {chargementStats
+    ? '…'
+    : stat.titre === 'Clients inscrits'
+      ? statsAdmin.clients_inscrits.toLocaleString('fr-FR')
+      : stat.titre === 'Ventes du jour'
+        ? `${Number(statsAdmin.ventes_du_jour).toLocaleString('fr-FR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })} HTG`
+        : stat.titre === 'Codes disponibles'
+          ? statsAdmin.codes_disponibles.toLocaleString('fr-FR')
+          : stat.titre === 'Plans disponibles'
+            ? statsAdmin.plans_disponibles.toLocaleString('fr-FR')
+            : stat.valeur}
+</p>
 
                     <p className="mt-3 text-xs leading-5 text-slate-500">
                       {stat.description}
@@ -800,40 +858,97 @@ const codesAffichesWifi = codesFiltresWifi.slice(
               </div>
 
               {/* Activité récente */}
-              <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-5 sm:px-6">
-                  <div>
-                    <h3 className="text-lg font-bold">
-                      Activité récente
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Suivi des opérations de la plateforme
-                    </p>
-                  </div>
+             
+{/* Activité récente */}
+<section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40">
+  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-5 sm:px-6">
+    <div>
+      <h3 className="text-lg font-bold">
+        Activité récente
+      </h3>
+      <p className="mt-1 text-sm text-slate-500">
+        Suivi des opérations de la plateforme
+      </p>
+    </div>
 
-                  <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-xs font-semibold text-cyan-300">
-                    En préparation
-                  </span>
-                </div>
+    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300">
+      {transactionsRecentes.length} opération(s)
+    </span>
+  </div>
 
-                <div className="p-5 sm:p-6">
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-5 py-12 text-center">
-                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-2xl">
-                      ↗
-                    </div>
+  <div className="space-y-4 p-5 sm:p-6">
+    {chargementTransactions ? (
+      <p className="text-sm text-slate-400">
+        Chargement des transactions...
+      </p>
+    ) : erreurTransactions ? (
+      <p role="alert" className="text-sm text-red-400">
+        {erreurTransactions}
+      </p>
+    ) : transactionsRecentes.length === 0 ? (
+      <div className="rounded-xl border border-dashed border-white/10 px-5 py-10 text-center">
+        <p className="font-semibold text-slate-200">
+          Aucune transaction récente
+        </p>
+        <p className="mt-2 text-sm text-slate-500">
+          Les opérations apparaîtront ici dès qu’elles seront enregistrées.
+        </p>
+      </div>
+    ) : (
+      transactionsRecentes.map((transaction) => {
+        const montant = Number(transaction.amount);
+        const estEntree =
+          transaction.type === "recharge" ||
+          transaction.type === "transfer_in";
 
-                    <h4 className="font-semibold text-slate-200">
-                      Vos transactions apparaîtront ici
-                    </h4>
+        const libelles: Record<string, string> = {
+          recharge: "Recharge portefeuille",
+          transfer_out: "Transfert envoyé",
+          transfer_in: "Transfert reçu",
+          achat_wifi: "Achat Wi-Fi",
+        };
 
-                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-                      Les commandes, les ventes et les recharges seront
-                      affichées ici après connexion aux routes de votre
-                      backend FastAPI.
-                    </p>
-                  </div>
-                </div>
-              </section>
+        return (
+          <div
+            key={transaction.id}
+            className="flex items-center justify-between gap-4 border-b border-white/10 pb-4 last:border-0 last:pb-0"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-100">
+                {libelles[transaction.type] ??
+                  transaction.description}
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {transaction.user_name} · {transaction.user_phone}
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                {new Date(transaction.date).toLocaleString("fr-FR")}
+              </p>
+            </div>
+
+            <p
+              className={`shrink-0 text-sm font-bold ${
+                estEntree
+                  ? "text-emerald-400"
+                  : "text-slate-200"
+              }`}
+            >
+              {estEntree ? "+" : "-"}
+              {montant.toLocaleString("fr-FR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {transaction.currency}
+            </p>
+          </div>
+        );
+      })
+    )}
+  </div>
+</section>
+
             </>
           ) : sectionActive === 'Comptes' ? (
             <section className="space-y-6">
@@ -992,7 +1107,7 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                     />
                   </label>
 
-                  <label className="text-sm text-slate-300 sm:col-span-2">
+                  <label className="text-sm text-slate-300">
                     Type de compte
                     <select
                       value={roleClient}
@@ -1106,7 +1221,126 @@ const codesAffichesWifi = codesFiltresWifi.slice(
                 )}
               </div>
             </section>
-          ) : sectionActive === 'Forfaits Wi-Fi' ? (
+
+) : sectionActive === 'Portefeuilles' ? (
+  <section className="space-y-6">
+    <div>
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+        Gestion financière
+      </p>
+
+      <h1 className="text-2xl font-extrabold sm:text-3xl">
+        Portefeuilles clients
+      </h1>
+
+      <p className="mt-2 text-sm text-slate-400">
+        Consulte les comptes clients et leurs soldes disponibles.
+      </p>
+    </div>
+
+    <div className="grid gap-4 sm:grid-cols-2">
+      <article className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+        <p className="text-sm text-slate-400">Nombre de clients</p>
+        <p className="mt-2 text-3xl font-extrabold text-cyan-300">
+          {chargementClients ? '…' : clients.filter(c => c.role === 'user').length}
+        </p>
+      </article>
+
+      <article className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+        <p className="text-sm text-slate-400">Solde total des portefeuilles</p>
+        <p className="mt-2 text-2xl font-extrabold text-emerald-400">
+          {chargementClients
+            ? '…'
+            : clients.some(c => c.role === 'user' && c.balance == null)
+              ? 'Données incomplètes'
+              : `${clients
+                  .filter(c => c.role === 'user')
+                  .reduce((total, c) => total + Number(c.balance ?? 0), 0)
+                  .toLocaleString('fr-FR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} HTG`}
+        </p>
+      </article>
+    </div>
+
+    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-5">
+        <div>
+          <h2 className="font-bold">Liste des portefeuilles</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Soldes individuels des clients
+          </p>
+        </div>
+
+       
+<button
+  type="button"
+  onClick={() => setVersionClients(v => v + 1)}
+  className="rounded-xl border border-cyan-400/20 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
+>
+  Actualiser
+</button>
+      </div>
+
+      {chargementClients ? (
+        <p className="p-5 text-sm text-slate-400">
+          Chargement des portefeuilles…
+        </p>
+      ) : erreurClients ? (
+        <p role="alert" className="p-5 text-sm text-red-300">
+          {erreurClients}
+        </p>
+      ) : (
+        <table className="w-full min-w-[700px] text-left text-sm">
+          <thead className="bg-white/[0.03] text-slate-400">
+            <tr>
+              <th className="p-4">Client</th>
+              <th className="p-4">Téléphone</th>
+              <th className="p-4">Solde disponible</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-white/5">
+            {clients
+              .filter(client => client.role === 'user')
+              .map(client => (
+                <tr key={client.id} className="transition hover:bg-white/[0.02]">
+                  <td className="p-4 font-semibold text-white">
+                    {client.full_name}
+                  </td>
+
+                  <td className="p-4 text-slate-300">
+                    {client.phone}
+                  </td>
+
+                  <td className="p-4 font-bold text-emerald-400">
+                    {client.balance == null
+                      ? '-'
+                      : Number(client.balance).toLocaleString('fr-FR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })+ ' HTG'}
+                  </td>
+
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+
+      {!chargementClients &&
+        !erreurClients &&
+        clients.filter(client => client.role === 'user').length === 0 && (
+          <p className="p-5 text-sm text-slate-400">
+            Aucun compte client à afficher.
+          </p>
+        )}
+    </div>
+  </section>
+) : sectionActive === 'Forfaits Wi-Fi' ? (
+
+
   <section className="space-y-6">
     <div>
       <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
@@ -1357,20 +1591,25 @@ const codesAffichesWifi = codesFiltresWifi.slice(
       ) : (
 <div className="overflow-x-auto">
           <table className="w-full min-w-[950px] table-fixed text-left text-sm">
-  <colgroup>
-    <col className="w-[45%]" />
-    <col className="w-[23%]" />
-    <col className="w-[14%]" />
-    <col className="w-[18%]" />
-  </colgroup>
-            <thead className="bg-white/[0.03] text-slate-400">
-              <tr>
-                <th className="p-4">Code Wi-Fi</th>
-                <th className="p-4">Forfait</th>
-                <th className="p-4">Statut</th>
-                <th className="p-4">Date d’ajout</th>
-              </tr>
-            </thead>
+ <colgroup>
+  <col className="w-[25%]" />
+  <col className="w-[18%]" />
+  <col className="w-[12%]" />
+  <col className="w-[15%]" />
+  <col className="w-[15%]" />
+  <col className="w-[15%]" />
+</colgroup>
+
+<thead className="bg-white/[0.03] text-slate-400">
+  <tr>
+    <th className="p-4">Code Wi-Fi</th>
+    <th className="p-4">Forfait</th>
+    <th className="p-4">Statut</th>
+    <th className="p-4">Date et heure d’achat</th>
+    <th className="p-4">Nom du client</th>
+    <th className="p-4">Téléphone du client</th>
+  </tr>
+</thead>
 
             
 <tbody className="divide-y divide-white/5">
@@ -1378,18 +1617,25 @@ const codesAffichesWifi = codesFiltresWifi.slice(
     const statut = code.status.toUpperCase()
     const vendu = statut === 'SOLD' || statut === 'VENDU'
 
+    // Ces champs doivent être fournis par l'API.
+    //const details = code as typeof code & {
+      //sold_at?: string | null
+      //buyer_name?: string | null
+      //buyer_phone?: string | null
+   // }
+
     return (
       <tr
         key={code.id}
         className="transition hover:bg-white/[0.02]"
       >
         <td className="p-4">
-          <span className="block break-all rounded-lg border border-cyan-400/15 bg-cyan-400/[0.06] px-3 py-3 font-mono text-base font-bold tracking-wide text-cyan-300 sm:text-lg">
+          <span className="block break-all rounded-lg border border-cyan-400/15 bg-cyan-400/[0.06] px-3 py-3 font-mono font-bold tracking-wide text-cyan-300">
             {code.code}
           </span>
         </td>
 
-        <td className="break-words p-4 font-medium text-slate-200">
+        <td className="break-words p-4 text-slate-200">
           {code.plan_name ??
             forfaitsWifi.find((f) => f.id === code.plan_id)?.name ??
             `Forfait #${code.plan_id}`}
@@ -1407,22 +1653,30 @@ const codesAffichesWifi = codesFiltresWifi.slice(
           </span>
         </td>
 
-        <td className="whitespace-nowrap p-4 text-slate-300">
-          {code.created_at ? (
+        <td className="p-4 text-slate-300">
+          {vendu && code.sold_at ? (
             <>
-              <div className="font-medium">
-                {new Date(code.created_at).toLocaleDateString('fr-FR')}
+              <div>
+                {new Date(code.sold_at).toLocaleDateString('fr-FR')}
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                {new Date(code.created_at).toLocaleTimeString('fr-FR', {
+                {new Date(code.sold_at).toLocaleTimeString('fr-FR', {
                   hour: '2-digit',
                   minute: '2-digit',
                 })}
               </div>
             </>
           ) : (
-            <span className="text-slate-500">Date indisponible</span>
+            <span className="text-slate-500">—</span>
           )}
+        </td>
+
+        <td className="p-4 text-slate-200">
+          {vendu ? code.buyer_name || 'Non renseigné' : '—'}
+        </td>
+
+        <td className="p-4 text-slate-300">
+          {vendu ? code.buyer_phone || 'Non renseigné' : '—'}
         </td>
       </tr>
     )

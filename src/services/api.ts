@@ -228,6 +228,9 @@ export type CodeWifi = {
   plan_id: number
   plan_name: string
   created_at: string | null
+  sold_at?: string | null
+  buyer_name?: string | null
+  buyer_phone?: string | null
 }
 
 
@@ -346,4 +349,122 @@ export async function listerStatistiquesAdmin(): Promise<StatistiquesAdmin> {
   })
 
   return lireReponse<StatistiquesAdmin>(response)
+}
+
+
+
+
+
+export type Portefeuille = {
+  balance: string | number
+  currency: string
+}
+
+export type TransactionPortefeuille = {
+  id: string | number
+  type: 'recharge' | 'achat_wifi' | 'transfer_out' | 'transfer_in' | string
+  description: string
+  amount: string | number
+  currency: string
+  date: string
+  balance_after: string | number | null
+}
+
+export type TransferResponse = {
+  message: string
+  recipient_phone: string
+  amount: string | number
+  balance: string | number
+  currency: string
+}
+
+
+
+export type TransactionAdmin = {
+  id: string;
+  type: string;
+  description: string;
+  amount: string;
+  currency: string;
+  date: string;
+  balance_after: string | null;
+  user_name: string;
+  user_phone: string;
+};
+
+export async function listerTransactionsRecentesAdmin(): Promise<TransactionAdmin[]> {
+  const token = obtenirTokenAdmin();
+
+  const reponse = await fetch(
+    `${API_URL}/users/admin/transactions/recentes`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return lireReponse<TransactionAdmin[]>(reponse);
+}
+
+
+// Récupérer le portefeuille du client connecté
+export async function obtenirMonPortefeuille(): Promise<Portefeuille> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter pour consulter ton portefeuille.')
+  }
+
+  const response = await fetch(`${API_URL}/users/me/wallet`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  return lireReponse<Portefeuille>(response)
+}
+
+// Récupérer l'historique du client connecté
+export async function listerMesTransactions(): Promise<TransactionPortefeuille[]> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter pour consulter tes transactions.')
+  }
+
+  const response = await fetch(`${API_URL}/users/me/transactions`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  return lireReponse<TransactionPortefeuille[]>(response)
+}
+
+// Transférer de l'argent à un autre client par son numéro de téléphone
+export async function transfererArgent(donnees: {
+  phone: string
+  amount: string
+}): Promise<TransferResponse> {
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    throw new Error('Tu dois te connecter pour effectuer un transfert.')
+  }
+
+  const response = await fetch(`${API_URL}/users/me/transfer`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      phone: donnees.phone.trim(),
+      amount: donnees.amount,
+    }),
+  })
+
+  return lireReponse<TransferResponse>(response)
 }

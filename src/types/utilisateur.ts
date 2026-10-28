@@ -9,4 +9,6 @@ export type Utilisateur = {
   status: string
   created_at: string
   updated_at: string
+  balance?: string | number
+  currency?: string
 }
