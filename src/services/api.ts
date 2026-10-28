@@ -381,16 +381,20 @@ export type TransferResponse = {
 
 
 export type TransactionAdmin = {
-  id: string;
-  type: string;
-  description: string;
-  amount: string;
-  currency: string;
-  date: string;
-  balance_after: string | null;
-  user_name: string;
-  user_phone: string;
-};
+  id: string
+  type: string
+  description: string
+  amount: string
+  currency: string
+  date: string
+  balance_after: string | null
+  user_name: string
+  user_phone: string
+  sender_name?: string | null
+  sender_phone?: string | null
+  recipient_name?: string | null
+  recipient_phone?: string | null
+}
 
 export async function listerTransactionsRecentesAdmin(): Promise<TransactionAdmin[]> {
   const token = obtenirTokenAdmin();
@@ -467,4 +471,29 @@ export async function transfererArgent(donnees: {
   })
 
   return lireReponse<TransferResponse>(response)
+}
+
+
+
+export async function listerToutesTransactionsAdmin(
+  recherche = '',
+): Promise<TransactionAdmin[]> {
+  const token = obtenirTokenAdmin()
+
+  const params = new URLSearchParams()
+  if (recherche.trim()) {
+    params.set('q', recherche.trim())
+  }
+
+  const response = await fetch(
+    `${API_URL}/users/admin/transactions?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
+
+  return lireReponse<TransactionAdmin[]>(response)
 }

@@ -10,10 +10,12 @@ import {
   listerStatistiquesAdmin,
 } from '../services/api'
 
+
 import {
   listerTransactionsRecentesAdmin,
+  listerToutesTransactionsAdmin,
   type TransactionAdmin,
-} from "../services/api";
+} from '../services/api'
 
 import type {
   ForfaitWifi,
@@ -64,7 +66,7 @@ const navigation = [
   //{ titre: 'Recharges', icone: '↗' },
   { titre: 'Forfaits Wi-Fi', icone: '◇' },
   { titre: 'Codes Wi-Fi', icone: '▤' },
-  //{ titre: 'Commandes', icone: '≡' },
+  { titre: 'Transactions', icone: '≡' },
 ]
 
 
@@ -106,6 +108,15 @@ const [chargementTransactions, setChargementTransactions] =
   useState(true);
 const [erreurTransactions, setErreurTransactions] =
   useState<string | null>(null);
+
+
+  
+const [historiqueTransactions, setHistoriqueTransactions] =
+  useState<TransactionAdmin[]>([])
+const [rechercheTransaction, setRechercheTransaction] = useState('')
+const [chargementHistorique, setChargementHistorique] = useState(false)
+const [erreurHistorique, setErreurHistorique] = useState('')
+
 
 // Gestion des forfaits Wi-Fi
 const [forfaitsWifi, setForfaitsWifi] = useState<ForfaitWifi[]>([])
@@ -390,6 +401,67 @@ useEffect(() => {
       setCreationEnCours(false)
     }
   }
+
+
+
+async function chargerHistoriqueTransactions(recherche = rechercheTransaction) {
+  setChargementHistorique(true)
+  setErreurHistorique('')
+
+  try {
+    const resultat = await listerToutesTransactionsAdmin(recherche)
+    setHistoriqueTransactions(resultat)
+  } catch (erreur) {
+    setErreurHistorique(
+      erreur instanceof Error
+        ? erreur.message
+        : 'Impossible de charger l’historique des transactions.',
+    )
+  } finally {
+    setChargementHistorique(false)
+  }
+}
+
+
+
+useEffect(() => {
+  if (sectionActive !== 'Transactions') return
+
+  let actif = true
+
+  async function chargerHistorique() {
+    setChargementHistorique(true)
+    setErreurHistorique('')
+
+    try {
+      const resultat = await listerToutesTransactionsAdmin(
+        rechercheTransaction,
+      )
+
+      if (actif) {
+        setHistoriqueTransactions(resultat)
+      }
+    } catch (erreur) {
+      if (actif) {
+        setErreurHistorique(
+          erreur instanceof Error
+            ? erreur.message
+            : 'Impossible de charger l’historique des transactions.',
+        )
+      }
+    } finally {
+      if (actif) setChargementHistorique(false)
+    }
+  }
+
+  void chargerHistorique()
+
+  return () => {
+    actif = false
+  }
+}, [sectionActive])
+
+
 
   async function gererRecharge(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -1730,6 +1802,181 @@ const codesAffichesWifi = codesFiltresWifi.slice(
         </div>
       )}
 
+    </div>
+  </section>
+
+  
+) : sectionActive === 'Transactions' ? (
+  <section className="space-y-6">
+    <div>
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+        Suivi financier
+      </p>
+      <h1 className="text-2xl font-extrabold sm:text-3xl">
+        Historique des transactions
+      </h1>
+      <p className="mt-2 text-sm text-slate-400">
+        Achats Wi-Fi, recharges et transferts entre clients.
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+      <form
+        className="flex flex-col gap-3 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void chargerHistoriqueTransactions(rechercheTransaction)
+        }}
+      >
+        <input
+          value={rechercheTransaction}
+          onChange={(e) => setRechercheTransaction(e.target.value)}
+          placeholder="Rechercher par nom ou téléphone..."
+          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
+        />
+
+        <button
+          type="submit"
+          disabled={chargementHistorique}
+          className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50"
+        >
+          Rechercher
+        </button>
+
+        <button
+          type="button"
+          disabled={chargementHistorique}
+          onClick={() => {
+            setRechercheTransaction('')
+            void chargerHistoriqueTransactions('')
+          }}
+          className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-white/5 disabled:opacity-50"
+        >
+          Tout afficher
+        </button>
+      </form>
+    </div>
+
+    {erreurHistorique && (
+      <p role="alert" className="rounded-xl bg-red-400/10 p-4 text-sm text-red-300">
+        {erreurHistorique}
+      </p>
+    )}
+
+    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 p-5">
+        <div>
+          <h2 className="font-bold">Toutes les opérations</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {chargementHistorique
+              ? 'Chargement de l’historique...'
+              : `${historiqueTransactions.length} transaction(s)`}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={chargementHistorique}
+          onClick={() =>
+            void chargerHistoriqueTransactions(rechercheTransaction)
+          }
+          className="rounded-lg border border-cyan-400/20 px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-400/10 disabled:opacity-50"
+        >
+          Actualiser
+        </button>
+      </div>
+
+      {chargementHistorique ? (
+        <p className="p-5 text-sm text-slate-400">
+          Chargement des transactions...
+        </p>
+      ) : historiqueTransactions.length === 0 ? (
+        <p className="p-6 text-sm text-slate-400">
+          Aucune transaction à afficher.
+        </p>
+      ) : (
+        <table className="w-full min-w-[950px] text-left text-sm">
+          <thead className="bg-white/[0.03] text-slate-400">
+            <tr>
+              <th className="p-4">Type</th>
+              <th className="p-4">Expéditeur / Client</th>
+              <th className="p-4">Destinataire</th>
+              <th className="p-4">Montant</th>
+              <th className="p-4">Date</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-white/5">
+            {historiqueTransactions.map((transaction) => {
+              const type = transaction.type.toLowerCase()
+
+              const libelles: Record<string, string> = {
+                achat_wifi: 'ACHAT Wi-Fi',
+                recharge: 'RECHARGE',
+                transfert: 'TRANSFERT',
+                transfer_in: 'TRANSFERT reçu',
+                transfer_out: 'TRANSFERT envoyé',
+              }
+
+              return (
+                <tr
+                  key={transaction.id}
+                  className="transition hover:bg-white/[0.02]"
+                >
+                  <td className="p-4">
+                    <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-2 py-1 text-xs font-bold text-cyan-300">
+                      {libelles[type] ?? transaction.type}
+                    </span>
+                  </td>
+
+                  <td className="p-4">
+                    <p className="font-semibold text-slate-100">
+                      {transaction.sender_name ||
+                        transaction.user_name ||
+                        '—'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {transaction.sender_phone ||
+                        transaction.user_phone ||
+                        '—'}
+                    </p>
+                  </td>
+
+                  <td className="p-4">
+                    {type === 'transfert' ||
+                    type === 'transfer_in' ||
+                    type === 'transfer_out' ? (
+                      <>
+                        <p className="font-semibold text-slate-200">
+                          {transaction.recipient_name || 'Nom non disponible'}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {transaction.recipient_phone ||
+                            'Téléphone non disponible'}
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-slate-500">—</span>
+                    )}
+                  </td>
+
+                  <td className="whitespace-nowrap p-4 font-bold text-emerald-400">
+                    {Number(transaction.amount).toLocaleString('fr-FR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    {transaction.currency}
+                  </td>
+
+                  <td className="whitespace-nowrap p-4 text-slate-300">
+                    {new Date(transaction.date).toLocaleString('fr-FR')}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   </section>
 ) : (
